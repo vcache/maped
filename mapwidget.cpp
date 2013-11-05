@@ -2,10 +2,29 @@
 #include <QDir>
 
 MapWidget::MapWidget(QWidget *parent) :
-    QWidget(parent), mRows(0), mCols(0), mTileSize(-1, -1), mViewportPos(.0f, .0f), cellUnderMouse(-1, -1), mScale(1.0f)
+    QWidget(parent), mRows(0), mCols(0), mTileSize(-1, -1), mViewportPos(.0f, .0f), mCellUnderMouse(-1, -1), mSelectedCell(-1, -1), mScale(1.0f)
 {
     setMouseTracking(true);
 }
+
+void MapWidget::setMapSize(int rows, int cols)
+{
+    QVector<int> newCells(rows * cols);
+    if (!mCells.isEmpty()) {
+        int i, j;
+        int mrow = qMin<int>(rows, mRows);
+        int mcol = qMin<int>(cols, mCols);
+        for(i = 0; i < mrow; i++) {
+            for(j = 0; j < mcol; j++)
+                newCells[i + j * cols] = mCells[i + j * mCols];
+        }
+    }
+    mRows = rows;
+    mCols = cols;
+    mCells = newCells;
+    update();
+}
+
 
 bool MapWidget::loadTiles(QString const & dir)
 {
@@ -61,10 +80,6 @@ QPoint MapWidget::getCellUnderMouse(QPointF const & mouse) const
     return QPoint(global.rx() / mTileSize.width(), global.ry() / mTileSize.height());
 }
 
-bool MapWidget::isValidCell(QPoint const & cell) const {
-    return cell.x() >= 0 && cell.y() >= 0 && cell.x() < mCols && cell.y() < mRows;
-}
-
 void MapWidget::mouseMoveEvent(QMouseEvent * event)
 {
     if (event->buttons() & Qt::MidButton) {
@@ -73,8 +88,8 @@ void MapWidget::mouseMoveEvent(QMouseEvent * event)
     }
 
     QPoint cell = getCellUnderMouse(event->localPos());
-    if (cell != cellUnderMouse) {
-        cellUnderMouse = cell;
+    if (cell != mCellUnderMouse) {
+        mCellUnderMouse = cell;
         update();
     }
 
@@ -96,10 +111,13 @@ void MapWidget::mouseReleaseEvent(QMouseEvent *event)
     } else if (event->button() == Qt::RightButton) {
         QPoint cell = getCellUnderMouse(event->localPos());
         if (isValidCell(cell)) {
-            selectedCell = cell;
-            // TODO: emit signal cellSelected
-            update();
+            mSelectedCell = cell;
+            emit cellSelected();
+        } else {
+            mSelectedCell = QPoint(-1, -1);
+            emit cellDeselected();
         }
+        update();
     }
 }
 
@@ -125,17 +143,18 @@ void MapWidget::paintEvent(QPaintEvent *)
     if (mTileSize.isValid()) {
         // TODO: draw tile here
 
-        if (selectedCell != cellUnderMouse && isValidCell(cellUnderMouse)) {
-            int x = cellUnderMouse.x() * mTileSize.width();
-            int y = cellUnderMouse.y() * mTileSize.height();
+        if (mSelectedCell != mCellUnderMouse && isValidCell(mCellUnderMouse)) {
+            int x = mCellUnderMouse.x() * mTileSize.width();
+            int y = mCellUnderMouse.y() * mTileSize.height();
             QString s;
-            QTextStream(&s) << cellUnderMouse.x() << "x" << cellUnderMouse.y();
+            QTextStream(&s) << mCellUnderMouse.x() << "x" << mCellUnderMouse.y();
             painter.fillRect(x, y, mTileSize.width(), mTileSize.height(), QColor(127, 127, 255, 127));
             painter.drawText(x, y, s);
 
         }
 
-        painter.fillRect(selectedCell.x() * mTileSize.width(), selectedCell.y() * mTileSize.height(), mTileSize.width(), mTileSize.height(), QColor(0, 255, 0, 127));
+        if (isValidCell(mSelectedCell))
+            painter.fillRect(mSelectedCell.x() * mTileSize.width(), mSelectedCell.y() * mTileSize.height(), mTileSize.width(), mTileSize.height(), QColor(0, 255, 0, 127));
 
         painter.setPen(Qt::red);
         painter.drawRect(-1, -1, mCols * mTileSize.width(), mRows * mTileSize.height());
