@@ -2,7 +2,7 @@
 #include <QDir>
 
 MapWidget::MapWidget(QWidget *parent) :
-    QWidget(parent), mRows(0), mCols(0), mTileSize(-1, -1), mViewportPos(.0f, .0f), mCellUnderMouse(-1, -1), mSelectedCell(-1, -1), mScale(1.0f)
+    QWidget(parent), mRows(0), mCols(0), mTileSize(-1, -1), mViewportPos(.0f, .0f), mCellUnderMouse(-1, -1), mSelectionBegin(NULL), mSelectionEnd(NULL), mScale(1.0f)
 {
     setMouseTracking(true);
 }
@@ -10,21 +10,56 @@ MapWidget::MapWidget(QWidget *parent) :
 void MapWidget::setMapSize(int rows, int cols)
 {
     QVector<int> newCells(rows * cols);
+    newCells.fill(-1);
     if (!mCells.isEmpty()) {
         int i, j;
         int mrow = qMin<int>(rows, mRows);
         int mcol = qMin<int>(cols, mCols);
-        for(i = 0; i < mrow; i++) {
-            for(j = 0; j < mcol; j++)
+        for(i = 0; i < mcol; i++) {
+            for(j = 0; j < mrow; j++)
                 newCells[i + j * cols] = mCells[i + j * mCols];
         }
     }
+    mCells = newCells;
     mRows = rows;
     mCols = cols;
-    mCells = newCells;
     update();
 }
 
+int MapWidget::getSelectedTile() const
+{
+    if (mSelectionBegin && mSelectionEnd) {
+        int common_tile_id = -1, tile_id, i, j;
+        bool have_first = false;
+        QRect selArea = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
+        for(i = selArea.left(); i <= selArea.right(); i++) {
+            for(j = selArea.top(); j <= selArea.bottom(); j++) {
+                tile_id = mCells[i + j * mCols];
+                if (have_first) {
+                    if (tile_id != common_tile_id)return -1;
+                } else {
+                    have_first = true;
+                    common_tile_id = tile_id;
+                }
+            } // for j
+        } // for i
+        return common_tile_id;
+    } // if selected
+    return -1;
+}
+
+void MapWidget::setSelectedTile(int tile)
+{
+    if (mSelectionBegin && mSelectionEnd) {
+        int i, j;
+        QRect selArea = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
+        for(i = selArea.left(); i <= selArea.right(); i++) {
+            for(j = selArea.top(); j <= selArea.bottom(); j++) {
+                mCells[i + j * mCols] = tile;
+            } // for j
+        } // for i
+    } // if (selected)
+}
 
 bool MapWidget::loadTiles(QString const & dir)
 {
@@ -77,7 +112,9 @@ QPointF MapWidget::localToGlobal(QPointF const & local) const
 QPoint MapWidget::getCellUnderMouse(QPointF const & mouse) const
 {
     QPointF global = localToGlobal(mouse);
-    return QPoint(global.rx() / mTileSize.width(), global.ry() / mTileSize.height());
+    return QPoint(
+        floor(global.x() / (((float)mTileSize.width()) * mScale)),
+        floor(global.y() / (((float)mTileSize.height()) * mScale)));
 }
 
 void MapWidget::mouseMoveEvent(QMouseEvent * event)
@@ -99,6 +136,15 @@ void MapWidget::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::MidButton) {
         mDragOrigin = event->localPos();
+    } else if (event->button() == Qt::RightButton) {
+        if (mSelectionBegin) delete mSelectionBegin;
+        mSelectionBegin = new QPoint;
+        *mSelectionBegin = getCellUnderMouse(event->localPos());
+
+        if (mSelectionEnd) {
+            delete mSelectionEnd;
+            mSelectionEnd = NULL;
+        }
     }
 }
 
@@ -109,52 +155,133 @@ void MapWidget::mouseReleaseEvent(QMouseEvent *event)
         mDragOffset.rx() = 0;
         mDragOffset.ry() = 0;
     } else if (event->button() == Qt::RightButton) {
-        QPoint cell = getCellUnderMouse(event->localPos());
-        if (isValidCell(cell)) {
-            mSelectedCell = cell;
-            emit cellSelected();
-        } else {
-            mSelectedCell = QPoint(-1, -1);
-            emit cellDeselected();
+        QPoint tmp = getCellUnderMouse(event->localPos());
+
+        if (mSelectionEnd) {
+            delete mSelectionEnd;
+            mSelectionEnd = NULL;
         }
-        update();
+
+        if (mSelectionBegin) {
+            if (!isValidCell(tmp) && tmp == *mSelectionBegin) {
+                delete mSelectionBegin;
+                mSelectionBegin = NULL;
+                emit cellDeselected();
+            } else {
+                mSelectionEnd = new QPoint;
+                *mSelectionEnd = tmp;
+                clipCellCoord(*mSelectionBegin);
+                clipCellCoord(*mSelectionEnd);
+                emit cellSelected();
+            }
+            update();
+        }
     }
 }
 
 void MapWidget::wheelEvent(QWheelEvent * event)
 {
-    mScale += (((float)event->angleDelta().y()) / 500.0f);
-    if (mScale < .0001f) mScale = .0001f;
+    if (event->angleDelta().y() > 0) mScale /= 1.1; else mScale *= 1.1;
     update();
+}
+
+void MapWidget::clipCellCoord(QPoint & c) const {
+    if (c.x() <= 0) {
+        c.setX(0);
+    } else if (c.x() >= mCols) {
+        c.setX(mCols - 1);
+    }
+
+    if (c.y() <= 0) {
+        c.setY(0);
+    } else if (c.y() >= mRows) {
+        c.setY(mRows - 1);
+    }
+}
+
+QRect MapWidget::getSelectedArea(QPoint const & fst, QPoint const & snd) const
+{
+    QRect frame;
+
+    frame.setLeft(qMin<int>(fst.x(), snd.x()));
+    if (frame.left() <= 0)
+        frame.setLeft(0);
+    else if (frame.left() >= mCols)
+        frame.setLeft(mCols - 1);
+
+    frame.setTop(qMin<int>(fst.y(), snd.y()));
+    if (frame.top() <= 0)
+        frame.setTop(0);
+    else if (frame.top() >= mRows)
+        frame.setTop(mRows - 1);
+
+    frame.setRight(frame.left() + qAbs(fst.x() - snd.x()));
+    if (frame.right() <= 0)
+        frame.setRight(0);
+    else if (frame.right() >= mCols)
+        frame.setRight(mCols - 1);
+
+    frame.setBottom(frame.top() + qAbs(fst.y() - snd.y()));
+    if (frame.bottom() <= 0)
+        frame.setBottom(0);
+    else if (frame.bottom() >= mRows)
+        frame.setBottom(mRows - 1);
+
+    return frame;
 }
 
 void MapWidget::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
-    QRectF rectf(0, 0, width()-1, height()-1);
+    QRectF rectf(0, 0, width(), height());
+    QPointF vpTopLeft = mViewportPos + mDragOffset;
+
+    painter.setRenderHint(QPainter::Antialiasing);
 
     painter.fillRect(rectf, Qt::black);
 
     painter.save();
-    painter.translate(mViewportPos);
-    painter.translate(mDragOffset);
+    painter.translate(vpTopLeft);
     painter.scale(mScale, mScale);
 
     if (mTileSize.isValid()) {
-        // TODO: draw tile here
+        int i, j, tile_indx;
+        QPoint visAreaBeg = getCellUnderMouse(QPoint(0,0));
+        clipCellCoord(visAreaBeg);
+        QPoint visAreaEnd = getCellUnderMouse(visAreaBeg + QPoint(this->width(), this->height()));
+        clipCellCoord(visAreaEnd);
 
-        if (mSelectedCell != mCellUnderMouse && isValidCell(mCellUnderMouse)) {
-            int x = mCellUnderMouse.x() * mTileSize.width();
-            int y = mCellUnderMouse.y() * mTileSize.height();
-            QString s;
-            QTextStream(&s) << mCellUnderMouse.x() << "x" << mCellUnderMouse.y();
-            painter.fillRect(x, y, mTileSize.width(), mTileSize.height(), QColor(127, 127, 255, 127));
-            painter.drawText(x, y, s);
-
+        for(i = visAreaBeg.x(); i <= visAreaEnd.x(); i++) {
+            for(j = visAreaBeg.y(); j <= visAreaEnd.y(); j++) {
+                tile_indx = mCells.at(i + j * mCols);
+                if (tile_indx >= 0)
+                    painter.drawImage(i * mTileSize.width(), j * mTileSize.height(), mTiles[tile_indx].im);
+            }
         }
 
-        if (isValidCell(mSelectedCell))
-            painter.fillRect(mSelectedCell.x() * mTileSize.width(), mSelectedCell.y() * mTileSize.height(), mTileSize.width(), mTileSize.height(), QColor(0, 255, 0, 127));
+        if (mSelectionBegin && !mSelectionEnd) {
+            QRect frame = getSelectedArea(*mSelectionBegin, mCellUnderMouse);
+            painter.fillRect(
+                frame.left() * mTileSize.width(),
+                frame.top() * mTileSize.height(),
+                frame.width() * mTileSize.width(),
+                frame.height() * mTileSize.height(),
+                QColor(127, 127, 255, 127));
+        } else if (isValidCell(mCellUnderMouse)) {
+            int x = mCellUnderMouse.x() * mTileSize.width();
+            int y = mCellUnderMouse.y() * mTileSize.height();
+            painter.fillRect(x, y, mTileSize.width(), mTileSize.height(), QColor(127, 127, 255, 127));
+        }
+
+        if (mSelectionBegin && mSelectionEnd) {
+            QRect frame = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
+            painter.fillRect(
+                frame.left() * mTileSize.width(),
+                frame.top() * mTileSize.height(),
+                frame.width() * mTileSize.width(),
+                frame.height() * mTileSize.height(),
+                QColor(0, 255, 0, 127));
+        }
 
         painter.setPen(Qt::red);
         painter.drawRect(-1, -1, mCols * mTileSize.width(), mRows * mTileSize.height());

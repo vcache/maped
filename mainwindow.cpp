@@ -19,19 +19,18 @@ MainWindow::MainWindow(QWidget *parent) :
     props = new QGroupBox;
     props->setTitle("Свойства");
 
-    propsLayout = new QVBoxLayout;
-        QFormLayout * locationPropsLayout = new QFormLayout;
-        locationPropsLayout->addRow(createLabel("Свойства карты"));
+    QFormLayout * propsLayout = new QFormLayout;
+        propsLayout->addRow(createLabel("Свойства карты"));
         mapRows = new QSpinBox;
         mapCols = new QSpinBox;
         connect(mapRows, SIGNAL(valueChanged(int)), this, SLOT(onMapSizeChanged(int)));
         connect(mapCols, SIGNAL(valueChanged(int)), this, SLOT(onMapSizeChanged(int)));
-        locationPropsLayout->addRow(createLabel("Строк:"), mapRows);
-        locationPropsLayout->addRow(createLabel("Столбцов:"), mapCols);
+        propsLayout->addRow(createLabel("Строк:"), mapRows);
+        propsLayout->addRow(createLabel("Столбцов:"), mapCols);
         selectTileset = new QPushButton;
         selectTileset->setText("(нет)");
         connect(selectTileset, SIGNAL(clicked()), this, SLOT(onSelectTileset()));
-        locationPropsLayout->addRow(createLabel("Набор тайлов:"), selectTileset);
+        propsLayout->addRow(createLabel("Набор тайлов:"), selectTileset);
         QComboBox * scaleCombo = new QComboBox;
         scaleCombo->addItem("200%");
         scaleCombo->addItem("150%");
@@ -45,8 +44,12 @@ MainWindow::MainWindow(QWidget *parent) :
         scaleCombo->setCurrentIndex(2);
         connect(scaleCombo, SIGNAL(currentIndexChanged(QString)), this, SLOT(onScaleSet(QString)));
         connect(scaleCombo, SIGNAL(editTextChanged(QString)), this, SLOT(onScaleSet(QString)));
-        locationPropsLayout->addRow(createLabel("Масштаб: "), scaleCombo);
-        propsLayout->addLayout(locationPropsLayout);
+        propsLayout->addRow(createLabel("Масштаб: "), scaleCombo);
+
+        propsLayout->addRow(createLabel("Свойства элемента"));
+        tiles = new QComboBox;
+        connect(tiles, SIGNAL(currentIndexChanged(int)), this, SLOT(onTileChanged(int)));
+        propsLayout->addRow(createLabel("Тип"), tiles);
     props->setLayout(propsLayout);
 
     QSplitter * splitter = new QSplitter;
@@ -70,22 +73,24 @@ MainWindow::MainWindow(QWidget *parent) :
 
     menu = menuBar()->addMenu("Справ&ка");
     act = menu->addAction("&О программе...");
+
+    loadTileSet("/home/igor/workspace/RainbowCrash/res/drawable-nodpi/");
+}
+
+void MainWindow::onTileChanged(int indx) {
+    qDebug() << "onTileChanged" << indx;
+    map->setSelectedTile(indx);
 }
 
 void MainWindow::onCellSelected() {
-    QFormLayout * tilePropsLayout = new QFormLayout;
-
-    tilePropsLayout->addRow(createLabel("Свойства элемента"));
-    tiles = new QComboBox;
-    tilePropsLayout->addRow(createLabel("Тип"), tiles);
-
-    propsLayout->addLayout(tilePropsLayout);
+    qDebug() << "onCellSelected";
+    tiles->setCurrentIndex(map->getSelectedTile());
 }
 
 void MainWindow::onCellDeselected() {
-
+    qDebug() << "onCellDeselected";
+    tiles->setCurrentIndex(-1);
 }
-
 
 void MainWindow::onScaleSet(QString s) {
     int scale = s.split('%')[0].toInt();
@@ -96,16 +101,22 @@ void MainWindow::onMapSizeChanged(int) {
     map->setMapSize(mapRows->value(), mapCols->value());
 }
 
-void MainWindow::onSelectTileset() {
-    QString dir = QFileDialog::getExistingDirectory(this, tr("Директория с тайлами"), "", QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+void MainWindow::loadTileSet(QString const & dir) {
     if (map->loadTiles(dir)) {
-        dir.truncate(15);
-        dir += "...";
-        selectTileset->setText(dir);
+        QString dir2 = dir;
+        dir2.truncate(15);
+        dir2 += "...";
+        selectTileset->setText(dir2);
         tiles->clear();
         map->insertInto(tiles);
+        tiles->setCurrentIndex(-1);
         map->update();
     }
+}
+
+void MainWindow::onSelectTileset() {
+    QString dir = QFileDialog::getExistingDirectory(this, tr("Директория с тайлами"), "", QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+    loadTileSet(dir);
 }
 
 QLabel *MainWindow::createLabel(const QString &text)

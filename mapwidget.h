@@ -15,12 +15,8 @@ public:
     inline void setScale(float s) { mScale = s; update(); }
     bool loadTiles(QString const & dir);
     void insertInto(QComboBox * tiles);
-    inline int getSelectedTile() const { return isValidCell(mSelectedCell) ? (mCells[mSelectedCell.x() + mSelectedCell.y() * mCols]) : -1; }
-    inline void setSelectedTile(int tile)
-    {
-        if (isValidCell(mSelectedCell))
-            mCells[mSelectedCell.x() + mSelectedCell.y() * mCols] = tile;
-    }
+    int getSelectedTile() const;
+    void setSelectedTile(int tile);
 
 protected:
     void paintEvent(QPaintEvent * event);
@@ -31,6 +27,8 @@ protected:
     inline QPoint getCellUnderMouse(QPointF const & mouse) const;
     inline bool isValidCell(QPoint const & cell) const { return cell.x() >= 0 && cell.y() >= 0 && cell.x() < mCols && cell.y() < mRows; }
     void wheelEvent(QWheelEvent * event);
+    void clipCellCoord(QPoint & c) const;
+    QRect getSelectedArea(QPoint const & fst, QPoint const & snd) const;
 
 signals:
     void cellSelected();
@@ -54,7 +52,7 @@ private:
     QPointF mDragOffset;
     QPointF mDragOrigin;
     QPoint mCellUnderMouse;
-    QPoint mSelectedCell;
+    QPoint * mSelectionBegin, * mSelectionEnd;
     float mScale;
 };
 

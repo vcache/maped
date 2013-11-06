@@ -33,8 +33,8 @@ private:
     QSpinBox *mapRows;
     QSpinBox *mapCols;
     QPushButton *selectTileset;
-    QVBoxLayout *propsLayout;
     QLabel *createLabel(const QString &text);
+    void loadTileSet(QString const & dir);
 
 protected slots:
     void onSelectTileset();
@@ -42,6 +42,7 @@ protected slots:
     void onScaleSet(QString);
     void onCellSelected();
     void onCellDeselected();
+    void onTileChanged(int);
 };
 
 #endif // MAPEDITOR_H
