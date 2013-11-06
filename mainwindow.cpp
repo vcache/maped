@@ -1,3 +1,8 @@
+/*
+ * \file mapwindow.cpp
+ * \author Igor Bereznyak <igor.bereznyak@gmail.com>
+ * \brief An implementation of the main window widget.
+ **/
 #include "mainwindow.h"
 #include "ui_mapeditor.h"
 
@@ -10,7 +15,7 @@
 #include <QFileDialog>
 
 MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent)
+    QMainWindow(parent), mDontChangeTileHack(false)
 {   
     map = new MapWidget;
     connect(map, SIGNAL(cellSelected()), this, SLOT(onCellSelected()));
@@ -78,17 +83,23 @@ MainWindow::MainWindow(QWidget *parent) :
 }
 
 void MainWindow::onTileChanged(int indx) {
-    qDebug() << "onTileChanged" << indx;
-    map->setSelectedTile(indx);
+    if (mDontChangeTileHack) { // note: because i don't know who emit signal - external user or tiles->setCurrentIndex()
+        mDontChangeTileHack = false;
+    } else {
+        qDebug() << "onTileChanged" << indx;
+        map->setSelectedTile(indx);
+    }
 }
 
 void MainWindow::onCellSelected() {
     qDebug() << "onCellSelected";
+    mDontChangeTileHack = true;
     tiles->setCurrentIndex(map->getSelectedTile());
 }
 
 void MainWindow::onCellDeselected() {
     qDebug() << "onCellDeselected";
+    mDontChangeTileHack = true;
     tiles->setCurrentIndex(-1);
 }
 

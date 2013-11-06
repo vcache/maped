@@ -1,3 +1,8 @@
+/*
+ * \file main.h
+ * \author Igor Bereznyak <igor.bereznyak@gmail.com>
+ * \brief Main file.
+ **/
 #include "mainwindow.h"
 #include <QApplication>
 

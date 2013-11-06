@@ -1,3 +1,8 @@
+/*
+ * \file mapwidget.h
+ * \author Igor Bereznyak <igor.bereznyak@gmail.com>
+ * \brief A header of the main MapEd widget.
+ **/
 #ifndef MAPWIDGET_H
 #define MAPWIDGET_H
 

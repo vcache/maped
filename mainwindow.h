@@ -1,3 +1,8 @@
+/*
+ * \file mapwindow.h
+ * \author Igor Bereznyak <igor.bereznyak@gmail.com>
+ * \brief A header file of the main window widget.
+ **/
 #ifndef MAPEDITOR_H
 #define MAPEDITOR_H
 
@@ -35,6 +40,7 @@ private:
     QPushButton *selectTileset;
     QLabel *createLabel(const QString &text);
     void loadTileSet(QString const & dir);
+    bool mDontChangeTileHack; // FIXME: that is dirty
 
 protected slots:
     void onSelectTileset();

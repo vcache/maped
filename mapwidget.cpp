@@ -1,3 +1,14 @@
+/*
+ * \file mapwidget.cpp
+ * \author Igor Bereznyak <igor.bereznyak@gmail.com>
+ * \brief An implementation of the main MapEd widget.
+ *
+ * TODO features:
+ *  - duplicate region
+ *  - grab region
+ *  - cleanup region (fill -1)
+ *
+ **/
 #include "mapwidget.h"
 #include <QDir>
 
@@ -58,6 +69,7 @@ void MapWidget::setSelectedTile(int tile)
                 mCells[i + j * mCols] = tile;
             } // for j
         } // for i
+        update();
     } // if (selected)
 }
 
