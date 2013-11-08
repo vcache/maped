@@ -18,7 +18,7 @@ public:
     explicit MapWidget(QWidget *parent = 0);
     void setMapSize(int rows, int cols);
     inline void setScale(float s) { mScale = s; update(); }
-    bool loadTiles(QString const & dir);
+    bool addTiles(QStringList const & files);
     void insertInto(QComboBox * tiles);
     int getSelectedTile() const;
     void setSelectedTile(int tile);

@@ -4,13 +4,16 @@
  * \brief An implementation of the main MapEd widget.
  *
  * TODO features:
+ *	- sprites list: add/remove
+ *  - save (json? bitmap?)
+ *  - load
  *  - duplicate region
  *  - grab region
  *  - cleanup region (fill -1)
- *
+ *  - static objects
  **/
 #include "mapwidget.h"
-#include <QDir>
+#include <QMessageBox>
 
 MapWidget::MapWidget(QWidget *parent) :
     QWidget(parent), mRows(0), mCols(0), mTileSize(-1, -1), mViewportPos(.0f, .0f), mCellUnderMouse(-1, -1), mSelectionBegin(NULL), mSelectionEnd(NULL), mScale(1.0f)
@@ -73,38 +76,39 @@ void MapWidget::setSelectedTile(int tile)
     } // if (selected)
 }
 
-bool MapWidget::loadTiles(QString const & dir)
+bool MapWidget::addTiles(QStringList const & files)
 {
-    QSize tileSize(-1, -1);
+    QSize tileSize = mTileSize;
     QVector<MapTile> tiles;
 
-    QDir d(dir);
-    d.setFilter(QDir::Files | QDir::Hidden | QDir::NoSymLinks);
-    QStringList filters;
-    filters << "*.png" << "*.bmp" << "*.jpg" << "*.jpeg";
-    d.setNameFilters(filters);
-
-    QFileInfoList list = d.entryInfoList();
-    for (int i = 0; i < list.size(); ++i) {
-        QFileInfo fileInfo = list.at(i);
-        QImage im(fileInfo.absoluteFilePath());
+    QStringList list = files;
+    for (QStringList::Iterator it = list.begin(); it != list.end(); ++it) {
+        QImage im(*it);
 
         if (!im.isNull()) {
-            qDebug() << "Loading tile: " << fileInfo.absoluteFilePath() << " / " << im.size();
+            qDebug() << "Loading tile: " << *it << " / " << im.size();
             if (tileSize.isEmpty()) {
                 tileSize = im.size();
             } else if (tileSize != im.size()) {
-                qDebug() << "Non-monotonic tile sizes: " << im.size() << "; while expecting: " << tileSize;
-                return false;
+                QMessageBox msg;
+                msg.setInformativeText("Operation canceled due to errors");
+                QString s = QString("Tile in file %1 have dimensions %2x%3 while expected tile size is %4x%5").arg(*it).arg(im.size().width()).arg(im.size().height()).arg(tileSize.width()).arg(tileSize.height());
+                msg.setText(s);
+                msg.setIcon(QMessageBox::Critical);
+                msg.exec();
+                return false; // to do: maybe just throw an exception?
             }
-            tiles << MapTile(fileInfo.fileName(), im);
-        } else
-            qDebug() << "Cannot read file " << fileInfo.absoluteFilePath();
+            tiles << MapTile(*it, im);
+        } else {
+            QMessageBox msg(QMessageBox::Warning, "Cannot read file", "Failed to read file " + *it);
+            msg.exec();
+        }
     }
 
     // If succeed
-    mTileSize = tileSize;
-    mTiles = tiles;
+    if (mTileSize.isEmpty())
+        mTileSize = tileSize;
+    mTiles += tiles;
 
     return true;
 }
@@ -278,11 +282,11 @@ void MapWidget::paintEvent(QPaintEvent *)
                 frame.top() * mTileSize.height(),
                 frame.width() * mTileSize.width(),
                 frame.height() * mTileSize.height(),
-                QColor(127, 127, 255, 127));
+                QColor(127, 127, 255, 50));
         } else if (isValidCell(mCellUnderMouse)) {
             int x = mCellUnderMouse.x() * mTileSize.width();
             int y = mCellUnderMouse.y() * mTileSize.height();
-            painter.fillRect(x, y, mTileSize.width(), mTileSize.height(), QColor(127, 127, 255, 127));
+            painter.fillRect(x, y, mTileSize.width(), mTileSize.height(), QColor(127, 127, 255, 50));
         }
 
         if (mSelectionBegin && mSelectionEnd) {

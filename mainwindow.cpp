@@ -15,27 +15,27 @@
 #include <QFileDialog>
 
 MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent), mDontChangeTileHack(false)
+    QMainWindow(parent)
 {   
     map = new MapWidget;
     connect(map, SIGNAL(cellSelected()), this, SLOT(onCellSelected()));
     connect(map, SIGNAL(cellDeselected()), this, SLOT(onCellDeselected()));
 
     props = new QGroupBox;
-    props->setTitle("Свойства");
+    props->setTitle("Properties");
 
     QFormLayout * propsLayout = new QFormLayout;
-        propsLayout->addRow(createLabel("Свойства карты"));
+        propsLayout->addRow(createLabel("Map properties"));
         mapRows = new QSpinBox;
         mapCols = new QSpinBox;
         connect(mapRows, SIGNAL(valueChanged(int)), this, SLOT(onMapSizeChanged(int)));
         connect(mapCols, SIGNAL(valueChanged(int)), this, SLOT(onMapSizeChanged(int)));
-        propsLayout->addRow(createLabel("Строк:"), mapRows);
-        propsLayout->addRow(createLabel("Столбцов:"), mapCols);
+        propsLayout->addRow(createLabel("Rows:"), mapRows);
+        propsLayout->addRow(createLabel("Columns:"), mapCols);
         selectTileset = new QPushButton;
-        selectTileset->setText("(нет)");
+        selectTileset->setText("Add tiles...");
         connect(selectTileset, SIGNAL(clicked()), this, SLOT(onSelectTileset()));
-        propsLayout->addRow(createLabel("Набор тайлов:"), selectTileset);
+        propsLayout->addRow(createLabel("Tile set:"), selectTileset);
         QComboBox * scaleCombo = new QComboBox;
         scaleCombo->addItem("200%");
         scaleCombo->addItem("150%");
@@ -49,12 +49,12 @@ MainWindow::MainWindow(QWidget *parent) :
         scaleCombo->setCurrentIndex(2);
         connect(scaleCombo, SIGNAL(currentIndexChanged(QString)), this, SLOT(onScaleSet(QString)));
         connect(scaleCombo, SIGNAL(editTextChanged(QString)), this, SLOT(onScaleSet(QString)));
-        propsLayout->addRow(createLabel("Масштаб: "), scaleCombo);
+        propsLayout->addRow(createLabel("Scale: "), scaleCombo);
 
-        propsLayout->addRow(createLabel("Свойства элемента"));
+        propsLayout->addRow(createLabel("Cell properties"));
         tiles = new QComboBox;
         connect(tiles, SIGNAL(currentIndexChanged(int)), this, SLOT(onTileChanged(int)));
-        propsLayout->addRow(createLabel("Тип"), tiles);
+        propsLayout->addRow(createLabel("Type:"), tiles);
     props->setLayout(propsLayout);
 
     QSplitter * splitter = new QSplitter;
@@ -68,39 +68,32 @@ MainWindow::MainWindow(QWidget *parent) :
 
     // for ref. see: http://www.zetcode.com/gui/qt4/menusandtoolbars/
 
-    menu = menuBar()->addMenu("&Файл");
-    act = menu->addAction("&Новый");
-    act = menu->addAction("&Открыть...");
-    act = menu->addAction("&Сохранить...");
+    menu = menuBar()->addMenu("&File");
+    act = menu->addAction("&New");
+    act = menu->addAction("&Open...");
+    act = menu->addAction("&Save...");
     menu->addSeparator();
-    act = menu->addAction("В&ыход");
+    act = menu->addAction("&Quit");
     connect(act, SIGNAL(triggered()), qApp, SLOT(quit()));
 
-    menu = menuBar()->addMenu("Справ&ка");
-    act = menu->addAction("&О программе...");
-
-    loadTileSet("/home/igor/workspace/RainbowCrash/res/drawable-nodpi/");
+    menu = menuBar()->addMenu("&Help");
+    act = menu->addAction("&About...");
 }
 
 void MainWindow::onTileChanged(int indx) {
-    if (mDontChangeTileHack) { // note: because i don't know who emit signal - external user or tiles->setCurrentIndex()
-        mDontChangeTileHack = false;
-    } else {
-        qDebug() << "onTileChanged" << indx;
-        map->setSelectedTile(indx);
-    }
+    map->setSelectedTile(indx);
 }
 
 void MainWindow::onCellSelected() {
-    qDebug() << "onCellSelected";
-    mDontChangeTileHack = true;
+    disconnect(tiles, SIGNAL(currentIndexChanged(int)), this, 0);
     tiles->setCurrentIndex(map->getSelectedTile());
+    connect(tiles, SIGNAL(currentIndexChanged(int)), this, SLOT(onTileChanged(int)));
 }
 
 void MainWindow::onCellDeselected() {
-    qDebug() << "onCellDeselected";
-    mDontChangeTileHack = true;
+    disconnect(tiles, SIGNAL(currentIndexChanged(int)), this, 0);
     tiles->setCurrentIndex(-1);
+    connect(tiles, SIGNAL(currentIndexChanged(int)), this, SLOT(onTileChanged(int)));
 }
 
 void MainWindow::onScaleSet(QString s) {
@@ -112,13 +105,8 @@ void MainWindow::onMapSizeChanged(int) {
     map->setMapSize(mapRows->value(), mapCols->value());
 }
 
-void MainWindow::loadTileSet(QString const & dir) {
-    if (map->loadTiles(dir)) {
-        QString dir2 = dir;
-        dir2.truncate(15);
-        dir2 += "...";
-        selectTileset->setText(dir2);
-        tiles->clear();
+void MainWindow::loadTileSet(QStringList const & files) {
+    if (map->addTiles(files)) {
         map->insertInto(tiles);
         tiles->setCurrentIndex(-1);
         map->update();
@@ -126,8 +114,8 @@ void MainWindow::loadTileSet(QString const & dir) {
 }
 
 void MainWindow::onSelectTileset() {
-    QString dir = QFileDialog::getExistingDirectory(this, tr("Директория с тайлами"), "", QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
-    loadTileSet(dir);
+    QStringList files = QFileDialog::getOpenFileNames(this, "Select one or more files to open", "/home/igor/workspace/RainbowCrash/res/drawable-nodpi/", "Images (*.png *.xpm *.jpg *.bmp *.jpeg)");
+    loadTileSet(files);
 }
 
 QLabel *MainWindow::createLabel(const QString &text)

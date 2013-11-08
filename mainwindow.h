@@ -39,8 +39,7 @@ private:
     QSpinBox *mapCols;
     QPushButton *selectTileset;
     QLabel *createLabel(const QString &text);
-    void loadTileSet(QString const & dir);
-    bool mDontChangeTileHack; // FIXME: that is dirty
+    void loadTileSet(QStringList const & files);
 
 protected slots:
     void onSelectTileset();
