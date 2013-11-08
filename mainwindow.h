@@ -38,10 +38,13 @@ private:
     QSpinBox *mapRows;
     QSpinBox *mapCols;
     QPushButton *selectTileset;
+    QComboBox * scaleCombo;
     QLabel *createLabel(const QString &text);
     void loadTileSet(QStringList const & files);
 
 protected slots:
+    void onOpenRequest();
+    void onSaveRequest();
     void onSelectTileset();
     void onMapSizeChanged(int);
     void onScaleSet(QString);

@@ -22,6 +22,10 @@ public:
     void insertInto(QComboBox * tiles);
     int getSelectedTile() const;
     void setSelectedTile(int tile);
+    bool saveMap(QString const & filename) const;
+    void loadMap(QString const & filename);
+    inline int getRows() const { return mRows; }
+    inline int getCols() const { return mCols; }
 
 protected:
     void paintEvent(QPaintEvent * event);
@@ -49,8 +53,10 @@ private:
     struct MapTile {
         QImage im;
         QString fileName;
-        MapTile() {}
-        MapTile(QString const & fname, QImage const & i): im(i), fileName(fname) {}
+        bool valid;
+        MapTile(): valid(false) {}
+        MapTile(QString const & fname, QImage const & i): im(i), fileName(fname), valid(true) {}
+        inline bool isValid() const { return valid; }
     };
     QVector<MapTile> mTiles;
     QPointF mViewportPos;

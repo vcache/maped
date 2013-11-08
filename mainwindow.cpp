@@ -13,6 +13,7 @@
 #include <QComboBox>
 #include <QPushButton>
 #include <QFileDialog>
+#include <QMessageBox>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent)
@@ -36,7 +37,7 @@ MainWindow::MainWindow(QWidget *parent) :
         selectTileset->setText("Add tiles...");
         connect(selectTileset, SIGNAL(clicked()), this, SLOT(onSelectTileset()));
         propsLayout->addRow(createLabel("Tile set:"), selectTileset);
-        QComboBox * scaleCombo = new QComboBox;
+        scaleCombo = new QComboBox;
         scaleCombo->addItem("200%");
         scaleCombo->addItem("150%");
         scaleCombo->addItem("100%");
@@ -71,13 +72,47 @@ MainWindow::MainWindow(QWidget *parent) :
     menu = menuBar()->addMenu("&File");
     act = menu->addAction("&New");
     act = menu->addAction("&Open...");
+    connect(act, SIGNAL(triggered()), this, SLOT(onOpenRequest()));
     act = menu->addAction("&Save...");
+    connect(act, SIGNAL(triggered()), this, SLOT(onSaveRequest()));
     menu->addSeparator();
     act = menu->addAction("&Quit");
     connect(act, SIGNAL(triggered()), qApp, SLOT(quit()));
 
     menu = menuBar()->addMenu("&Help");
     act = menu->addAction("&About...");
+}
+
+void MainWindow::onOpenRequest()
+{
+    QString fname = QFileDialog::getOpenFileName(this, "Select file", "", "JSON plain-text (*.json);; Binary JSON (*.bson)");
+    try {
+        map->loadMap(fname);
+        disconnect(tiles, SIGNAL(currentIndexChanged(int)), this, 0);
+        disconnect(mapRows, SIGNAL(valueChanged(int)), this, 0);
+        disconnect(mapCols, SIGNAL(valueChanged(int)), this, 0);
+        tiles->clear();
+        map->insertInto(tiles);
+        tiles->setCurrentIndex(-1);
+        mapRows->setValue(map->getRows());
+        mapCols->setValue(map->getCols());
+        scaleCombo->setCurrentIndex(2);
+        connect(tiles, SIGNAL(currentIndexChanged(int)), this, SLOT(onTileChanged(int)));
+        connect(mapRows, SIGNAL(valueChanged(int)), this, SLOT(onMapSizeChanged(int)));
+        connect(mapCols, SIGNAL(valueChanged(int)), this, SLOT(onMapSizeChanged(int)));
+    } catch (QString & s) {
+        QMessageBox msg(QMessageBox::Critical, "Failed to open map", s);
+        msg.exec();
+    }
+}
+
+void MainWindow::onSaveRequest()
+{
+    QString fname = QFileDialog::getSaveFileName(this, "Select file", "", "JSON plain-text (*.json);; Binary JSON (*.bson)");
+    if (!map->saveMap(fname)) {
+        QMessageBox msg(QMessageBox::Critical, "Failed to save map", "TODO HERE");
+        msg.exec();
+    }
 }
 
 void MainWindow::onTileChanged(int indx) {

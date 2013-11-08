@@ -4,16 +4,20 @@
  * \brief An implementation of the main MapEd widget.
  *
  * TODO features:
- *	- sprites list: add/remove
- *  - save (json? bitmap?)
- *  - load
+ *	- sprites list: remove
  *  - duplicate region
  *  - grab region
  *  - cleanup region (fill -1)
  *  - static objects
  **/
 #include "mapwidget.h"
+
 #include <QMessageBox>
+#include <QJsonValue>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QFile>
 
 MapWidget::MapWidget(QWidget *parent) :
     QWidget(parent), mRows(0), mCols(0), mTileSize(-1, -1), mViewportPos(.0f, .0f), mCellUnderMouse(-1, -1), mSelectionBegin(NULL), mSelectionEnd(NULL), mScale(1.0f)
@@ -23,6 +27,8 @@ MapWidget::MapWidget(QWidget *parent) :
 
 void MapWidget::setMapSize(int rows, int cols)
 {
+    if (rows == mRows && cols == mCols) return;
+
     QVector<int> newCells(rows * cols);
     newCells.fill(-1);
     if (!mCells.isEmpty()) {
@@ -40,40 +46,132 @@ void MapWidget::setMapSize(int rows, int cols)
     update();
 }
 
-int MapWidget::getSelectedTile() const
+bool MapWidget::saveMap(QString const & filename) const
 {
-    if (mSelectionBegin && mSelectionEnd) {
-        int common_tile_id = -1, tile_id, i, j;
-        bool have_first = false;
-        QRect selArea = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
-        for(i = selArea.left(); i <= selArea.right(); i++) {
-            for(j = selArea.top(); j <= selArea.bottom(); j++) {
-                tile_id = mCells[i + j * mCols];
-                if (have_first) {
-                    if (tile_id != common_tile_id)return -1;
-                } else {
-                    have_first = true;
-                    common_tile_id = tile_id;
-                }
-            } // for j
-        } // for i
-        return common_tile_id;
-    } // if selected
-    return -1;
+    QJsonObject jsn_map;
+    QJsonObject jsn_tiles;
+    QJsonArray jsn_cells;
+
+    for(int i = 0; i < mTiles.size(); ++i) {
+        QString index = QString("%1").arg(i);
+        jsn_tiles.insert(index, QJsonValue(mTiles[i].fileName));
+    }
+
+    for(QVector<int>::const_iterator it = mCells.begin(); it != mCells.end(); ++it)
+        jsn_cells.push_back(QJsonValue(*it));
+
+    jsn_map.insert("rows", QJsonValue(mRows));
+    jsn_map.insert("cols", QJsonValue(mCols));
+    jsn_map.insert("tiles", jsn_tiles);
+    jsn_map.insert("cells", jsn_cells);
+
+    QJsonDocument jsn_doc(jsn_map);
+    QByteArray jsn_out = filename.endsWith("json") ? jsn_doc.toJson() : jsn_doc.toBinaryData();
+
+    QFile qf(filename);
+    if (!qf.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return false;
+
+    if (-1 == qf.write(jsn_out)) {
+        qf.close();
+        return false;
+    }
+
+    qf.close();
+    return true;
 }
 
-void MapWidget::setSelectedTile(int tile)
-{
-    if (mSelectionBegin && mSelectionEnd) {
-        int i, j;
-        QRect selArea = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
-        for(i = selArea.left(); i <= selArea.right(); i++) {
-            for(j = selArea.top(); j <= selArea.bottom(); j++) {
-                mCells[i + j * mCols] = tile;
-            } // for j
-        } // for i
-        update();
-    } // if (selected)
+void MapWidget::loadMap(QString const & filename) {
+    // read file
+
+    QFile qf(filename);
+    if (!qf.open(QIODevice::ReadOnly))
+        throw qf.errorString();
+
+    QByteArray jsn_in = qf.readAll();
+    qf.close();
+    if (jsn_in.isEmpty())
+        throw QString("Empty file");
+
+    // parse file
+
+    QJsonDocument jsn_doc;
+    if (filename.endsWith("json")) {
+        jsn_doc = QJsonDocument::fromJson(jsn_in);
+    } else {
+        jsn_doc = QJsonDocument::fromBinaryData(jsn_in);
+    }
+    if (jsn_doc.isNull()) throw QString("Failed to validate JSON data");
+    if (!jsn_doc.isObject()) throw QString("Top level JSON value is not an object");
+    QJsonObject jsn_map = jsn_doc.object();
+
+    // load generic map info
+
+    QJsonObject::const_iterator it;
+    it = jsn_map.find("rows");
+    if (it == jsn_map.end()) throw QString("File not contains 'rows'");
+    if (!it.value().isDouble()) throw QString("'rows' is not a number");
+    int rows = int(it.value().toDouble());
+
+    it = jsn_map.find("cols");
+    if (it == jsn_map.end()) throw QString("File not contains 'cols'");
+    if (!it.value().isDouble()) throw QString("'cols' is not a number");
+    int cols = int(it.value().toDouble());
+
+    // load tiles FIXME: each key must be in [0; jsn_tiles.size()-1] or assertion happens
+
+    it = jsn_map.find("tiles");
+    if (it == jsn_map.end()) throw QString("File not contains 'tiles'");
+    if (!it.value().isObject()) throw QString("'cells' is not an objects");
+    QJsonObject jsn_tiles = it.value().toObject();
+    QVector<MapTile> tiles(jsn_tiles.size());
+    QSize tileSize(-1, -1);
+    int prev_tile_id = -1;
+    for(QJsonObject::const_iterator i = jsn_tiles.begin(); i != jsn_tiles.end(); ++i) {
+        int tile_id = i.key().toInt();
+        if (tile_id - prev_tile_id != 1) throw QString("Non-monotonic tile keys");
+        if (!i.value().isString()) throw QString("Incorrect tile's path");
+        QImage im(i.value().toString());
+        if (im.isNull()) throw QString("Can't open image");
+        if (tileSize.isEmpty()) {
+            tileSize = im.size();
+        } else if (tileSize != im.size()) {
+            throw QString("Tile's dimensions not same");
+        }
+        tiles[tile_id] = MapTile(i.value().toString(), im);
+        prev_tile_id = tile_id;
+    }
+
+    // load cells
+
+    QVector<int> cells(cols * rows);
+    it = jsn_map.find("cells");
+    if (it == jsn_map.end()) throw QString("File not contains 'cells'");
+    if (!it.value().isArray()) throw QString("'cells' is not an array");
+    QJsonArray jsn_cells = it.value().toArray();
+    if (jsn_cells.size() != cols * rows) throw QString("Incorrect 'cells' length");
+    int index = -1;
+    for(QJsonArray::const_iterator i = jsn_cells.begin(); i != jsn_cells.end(); ++i) {
+        if (!(*i).isDouble()) throw QString("Not number in 'cells'");
+        int val = int((*i).toDouble());
+        if (val < -1 || val >= tiles.size()) throw QString("Incorrect range in 'cells'");
+        if (val > 0 && false == tiles[val].isValid()) throw QString("Incorrect link in 'cells'");
+        cells[++index] = val;
+    }
+
+    // if everything is fine
+    mCells = cells;
+    mTiles = tiles;
+    mRows = rows;
+    mCols = cols;
+    mTileSize = tileSize;
+    mViewportPos = QPointF(.0f, .0f);
+    mCellUnderMouse = QPoint(-1, -1);
+    mSelectionBegin = NULL;
+    mSelectionEnd = NULL;
+    mScale = 1.0f;
+
+    update();
 }
 
 bool MapWidget::addTiles(QStringList const & files)
@@ -113,8 +211,43 @@ bool MapWidget::addTiles(QStringList const & files)
     return true;
 }
 
+int MapWidget::getSelectedTile() const
+{
+    if (mSelectionBegin && mSelectionEnd) {
+        int common_tile_id = -1, tile_id, i, j;
+        bool have_first = false;
+        QRect selArea = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
+        for(i = selArea.left(); i <= selArea.right(); i++) {
+            for(j = selArea.top(); j <= selArea.bottom(); j++) {
+                tile_id = mCells[i + j * mCols];
+                if (have_first) {
+                    if (tile_id != common_tile_id)return -1;
+                } else {
+                    have_first = true;
+                    common_tile_id = tile_id;
+                }
+            } // for j
+        } // for i
+        return common_tile_id;
+    } // if selected
+    return -1;
+}
+
+void MapWidget::setSelectedTile(int tile)
+{
+    if (mSelectionBegin && mSelectionEnd) {
+        int i, j;
+        QRect selArea = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
+        for(i = selArea.left(); i <= selArea.right(); i++) {
+            for(j = selArea.top(); j <= selArea.bottom(); j++) {
+                mCells[i + j * mCols] = tile;
+            } // for j
+        } // for i
+        update();
+    } // if (selected)
+}
+
 void MapWidget::insertInto(QComboBox * tiles) {
-    qDebug() << mTiles.size();
     for(int i = 0; i < mTiles.size(); i++) {
         tiles->addItem(QIcon(QPixmap::fromImage(mTiles[i].im)), mTiles[i].fileName);
     }
