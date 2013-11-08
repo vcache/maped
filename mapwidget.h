@@ -26,16 +26,19 @@ public:
     void loadMap(QString const & filename);
     inline int getRows() const { return mRows; }
     inline int getCols() const { return mCols; }
+    void eraseSelected();
+    void selectAll();
 
 protected:
     void paintEvent(QPaintEvent * event);
     void mouseMoveEvent(QMouseEvent *event);
     void mousePressEvent(QMouseEvent *event);
     void mouseReleaseEvent(QMouseEvent *event);
+    void wheelEvent(QWheelEvent * event);
+    void keyPressEvent(QKeyEvent * event);
     inline QPointF localToGlobal(QPointF const & local) const;
     inline QPoint getCellUnderMouse(QPointF const & mouse) const;
     inline bool isValidCell(QPoint const & cell) const { return cell.x() >= 0 && cell.y() >= 0 && cell.x() < mCols && cell.y() < mRows; }
-    void wheelEvent(QWheelEvent * event);
     void clipCellCoord(QPoint & c) const;
     QRect getSelectedArea(QPoint const & fst, QPoint const & snd) const;
 

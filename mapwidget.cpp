@@ -7,7 +7,6 @@
  *	- sprites list: remove
  *  - duplicate region
  *  - grab region
- *  - cleanup region (fill -1)
  *  - static objects
  **/
 #include "mapwidget.h"
@@ -23,6 +22,7 @@ MapWidget::MapWidget(QWidget *parent) :
     QWidget(parent), mRows(0), mCols(0), mTileSize(-1, -1), mViewportPos(.0f, .0f), mCellUnderMouse(-1, -1), mSelectionBegin(NULL), mSelectionEnd(NULL), mScale(1.0f)
 {
     setMouseTracking(true);
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 void MapWidget::setMapSize(int rows, int cols)
@@ -209,6 +209,37 @@ bool MapWidget::addTiles(QStringList const & files)
     return true;
 }
 
+void MapWidget::eraseSelected()
+{
+    if (!mSelectionBegin || !mSelectionEnd) return;
+
+    int i, j;
+    QRect selArea = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
+    for(i = selArea.left(); i <= selArea.right(); i++) {
+        for(j = selArea.top(); j <= selArea.bottom(); j++) {
+            mCells[i + j * mCols] = -1;
+        } // for j
+    } // for i
+    update();
+}
+
+void MapWidget::selectAll() {
+    QPoint b(0,0);
+    QPoint e(mCols - 1, mRows - 1);
+
+    if (mSelectionBegin && mSelectionEnd && *mSelectionBegin == b && *mSelectionEnd == e) {
+        delete mSelectionBegin;
+        delete mSelectionEnd;
+        mSelectionBegin = mSelectionEnd = NULL;
+    } else {
+        if (mSelectionBegin) delete mSelectionBegin;
+        if (mSelectionEnd) delete mSelectionEnd;
+        mSelectionBegin = new QPoint(b);
+        mSelectionEnd = new QPoint(e);
+    }
+    update();
+}
+
 int MapWidget::getSelectedTile() const
 {
     if (mSelectionBegin && mSelectionEnd) {
@@ -262,6 +293,16 @@ QPoint MapWidget::getCellUnderMouse(QPointF const & mouse) const
     return QPoint(
         floor(global.x() / (((float)mTileSize.width()) * mScale)),
         floor(global.y() / (((float)mTileSize.height()) * mScale)));
+}
+
+void MapWidget::keyPressEvent(QKeyEvent * event) {
+    if (event->key() == Qt::Key_X && event->modifiers() == Qt::NoModifier) {
+        eraseSelected();
+        update();
+    } else if (event->key() == Qt::Key_A && event->modifiers() == Qt::NoModifier) {
+        selectAll();
+    } else
+        QWidget::keyPressEvent(event);
 }
 
 void MapWidget::mouseMoveEvent(QMouseEvent * event)
@@ -393,7 +434,7 @@ void MapWidget::paintEvent(QPaintEvent *)
 
     if (mTileSize.isValid()) {
         int i, j, tile_indx;
-        QPoint visAreaBeg = getCellUnderMouse(QPoint(0,0));
+        QPoint visAreaBeg = getCellUnderMouse(QPoint(0,0)); // TODO: this is just viewport coords / width-height!
         clipCellCoord(visAreaBeg);
         QPoint visAreaEnd = getCellUnderMouse(visAreaBeg + QPoint(this->width(), this->height()));
         clipCellCoord(visAreaEnd);
