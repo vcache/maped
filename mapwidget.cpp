@@ -85,13 +85,11 @@ void MapWidget::loadMap(QString const & filename) {
     // read file
 
     QFile qf(filename);
-    if (!qf.open(QIODevice::ReadOnly))
-        throw qf.errorString();
+    if (!qf.open(QIODevice::ReadOnly)) throw qf.errorString();
 
     QByteArray jsn_in = qf.readAll();
     qf.close();
-    if (jsn_in.isEmpty())
-        throw QString("Empty file");
+    if (jsn_in.isEmpty()) throw QString("Empty file");
 
     // parse file
 
@@ -122,7 +120,7 @@ void MapWidget::loadMap(QString const & filename) {
 
     it = jsn_map.find("tiles");
     if (it == jsn_map.end()) throw QString("File not contains 'tiles'");
-    if (!it.value().isObject()) throw QString("'cells' is not an objects");
+    if (!it.value().isObject()) throw QString("'cells' is not an object");
     QJsonObject jsn_tiles = it.value().toObject();
     QVector<MapTile> tiles(jsn_tiles.size());
     QSize tileSize(-1, -1);
@@ -429,7 +427,7 @@ void MapWidget::paintEvent(QPaintEvent *)
                 frame.top() * mTileSize.height(),
                 frame.width() * mTileSize.width(),
                 frame.height() * mTileSize.height(),
-                QColor(0, 255, 0, 127));
+                QColor(0, 255, 0, 75));
         }
 
         painter.setPen(Qt::red);
