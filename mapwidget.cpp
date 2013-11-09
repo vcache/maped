@@ -4,11 +4,11 @@
  * \brief An implementation of the main MapEd widget.
  *
  * TODO features:
+ *  - some strange bug with cursor highligh
  *	- sprites list: remove
  *  - refact selArea
  *  - filtering?
  *  - duplicate region
- *  - grab region
  *  - static objects
  **/
 #include "mapwidget.h"
@@ -304,13 +304,27 @@ void MapWidget::startModeGrab()
 
 void MapWidget::startModeDuplicate()
 {
-    emit miscellaneousNotification("Not yet implemented");
+    if (mEditMode != NORMAL) {
+        miscellaneousNotification("Cannot duplicate from this mode");
+        return;
+    }
+
+    if (!mSelectionBegin || !mSelectionEnd) {
+        emit miscellaneousNotification("Nothing selected to duplicate");
+        return;
+    }
+
+    QRect globalOrigin = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
+    mGrabOrigin = mCellUnderMouse - globalOrigin.topLeft();
+    mEditMode = DUPLICATE;
+    update();
 }
 
 void MapWidget::finishSpecialMode(bool confirm)
 {
     switch (mEditMode) {
     case GRAB:
+    case DUPLICATE:
         if (confirm) {
             int i, j, ind, src_offset, dst_offset;
             ///! \todo Refact, this code is duplicated:
@@ -326,7 +340,7 @@ void MapWidget::finishSpecialMode(bool confirm)
                 for(j = destArea.height()-1; j >= 0; --j) {
                     ind = i + j * mCols;
                     mCells[dst_offset + ind] = mCells[src_offset + ind];
-                    mCells[src_offset + ind] = -1;
+                    if (mEditMode == GRAB) mCells[src_offset + ind] = -1;
                 }
             }
         }
@@ -572,6 +586,7 @@ void MapWidget::paintEvent(QPaintEvent *)
             break;
 
         case GRAB:
+        case DUPLICATE:
             {
                 QRect selArea = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
                 QRect frame(

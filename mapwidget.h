@@ -57,7 +57,7 @@ private:
     int mRows, mCols;
     QVector<int> mCells;
 
-    enum EditMode { NORMAL, GRAB };
+    enum EditMode { NORMAL, GRAB, DUPLICATE };
     EditMode mEditMode;
 
     QSize mTileSize;
