@@ -46,8 +46,8 @@ void MapWidget::setMapSize(int rows, int cols)
         int i, j;
         int mrow = qMin<int>(rows, mRows);
         int mcol = qMin<int>(cols, mCols);
-        for(i = 0; i < mcol; i++) {
-            for(j = 0; j < mrow; j++)
+        for(i = 0; i < mcol; ++i) {
+            for(j = 0; j < mrow; ++j)
                 newCells[i + j * cols] = mCells[i + j * mCols];
         }
     }
@@ -226,8 +226,8 @@ void MapWidget::eraseSelected()
 
     int i, j;
     QRect selArea = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
-    for(i = selArea.left(); i <= selArea.right(); i++) {
-        for(j = selArea.top(); j <= selArea.bottom(); j++) {
+    for(i = selArea.left(); i <= selArea.right(); ++i) {
+        for(j = selArea.top(); j <= selArea.bottom(); ++j) {
             mCells[i + j * mCols] = -1;
         } // for j
     } // for i
@@ -264,8 +264,8 @@ int MapWidget::getSelectedTile() const
         int common_tile_id = -1, tile_id, i, j;
         bool have_first = false;
         QRect selArea = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
-        for(i = selArea.left(); i <= selArea.right(); i++) {
-            for(j = selArea.top(); j <= selArea.bottom(); j++) {
+        for(i = selArea.left(); i <= selArea.right(); ++i) {
+            for(j = selArea.top(); j <= selArea.bottom(); ++j) {
                 tile_id = mCells[i + j * mCols];
                 if (have_first) {
                     if (tile_id != common_tile_id)return -1;
@@ -296,9 +296,10 @@ void MapWidget::startModeGrab()
         return;
     }
 
-    QRect gloablOrigin = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
-    //mGrabOrigin = getCellUnderMouse() - TODO HERE;
+    QRect globalOrigin = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
+    mGrabOrigin = mCellUnderMouse - globalOrigin.topLeft();
     mEditMode = GRAB;
+    update();
 }
 
 void MapWidget::startModeDuplicate()
@@ -306,13 +307,46 @@ void MapWidget::startModeDuplicate()
     emit miscellaneousNotification("Not yet implemented");
 }
 
+void MapWidget::finishSpecialMode(bool confirm)
+{
+    switch (mEditMode) {
+    case GRAB:
+        if (confirm) {
+            int i, j, ind, src_offset, dst_offset;
+            ///! \todo Refact, this code is duplicated:
+            QRect selArea = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
+            QRect destArea(
+                mCellUnderMouse.x() - mGrabOrigin.x(),
+                mCellUnderMouse.y() - mGrabOrigin.y(),
+                selArea.width(),
+                selArea.height());
+            src_offset = selArea.left() + selArea.top() * mCols;
+            dst_offset = destArea.left() + destArea.top() * mCols;
+            for(i = destArea.width()-1; i >= 0 ; --i) {
+                for(j = destArea.height()-1; j >= 0; --j) {
+                    ind = i + j * mCols;
+                    mCells[dst_offset + ind] = mCells[src_offset + ind];
+                    mCells[src_offset + ind] = -1;
+                }
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    mEditMode = NORMAL;
+    update();
+}
+
 void MapWidget::setSelectedTile(int tile)
 {
     if (mSelectionBegin && mSelectionEnd) {
         int i, j;
         QRect selArea = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
-        for(i = selArea.left(); i <= selArea.right(); i++) {
-            for(j = selArea.top(); j <= selArea.bottom(); j++) {
+        for(i = selArea.left(); i <= selArea.right(); ++i) {
+            for(j = selArea.top(); j <= selArea.bottom(); ++j) {
                 mCells[i + j * mCols] = tile;
             } // for j
         } // for i
@@ -321,7 +355,7 @@ void MapWidget::setSelectedTile(int tile)
 }
 
 void MapWidget::insertInto(QComboBox * tiles) {
-    for(int i = 0; i < mTiles.size(); i++) {
+    for(int i = 0; i < mTiles.size(); ++i) {
         tiles->addItem(QIcon(QPixmap::fromImage(mTiles[i].im)), mTiles[i].fileName);
     }
 }
@@ -349,10 +383,10 @@ void MapWidget::keyPressEvent(QKeyEvent * event) {
         startModeGrab();
     } else if (event->key() == Qt::Key_D && event->modifiers() == Qt::ShiftModifier) {
         startModeDuplicate();
-    } else if (event->key() == Qt::Key_Escape && event->modifiers() == Qt::ShiftModifier) {
-        mEditMode = NORMAL;
+    } else if (event->key() == Qt::Key_Escape && event->modifiers() == Qt::NoModifier) {
+        finishSpecialMode(false);
     } else if (event->key() == Qt::Key_Enter && event->modifiers() == Qt::ShiftModifier) {
-        //finishSpecialMode();
+        finishSpecialMode(true);
     } else
         QWidget::keyPressEvent(event);
 }
@@ -390,11 +424,16 @@ void MapWidget::mousePressEvent(QMouseEvent *event)
 
 void MapWidget::mouseReleaseEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::MidButton) {
+    switch(event->button()) {
+    case Qt::MidButton:
         mViewportPos += mDragOffset;
         mDragOffset.rx() = 0;
         mDragOffset.ry() = 0;
-    } else if (event->button() == Qt::RightButton) {
+        break;
+
+    case Qt::RightButton:
+    {
+        finishSpecialMode(false);
         QPoint tmp = getCellUnderMouse(event->localPos());
 
         if (mSelectionEnd) {
@@ -416,6 +455,15 @@ void MapWidget::mouseReleaseEvent(QMouseEvent *event)
             }
             update();
         }
+        break;
+    }
+
+    case Qt::LeftButton:
+        finishSpecialMode(true);
+        break;
+
+    default:
+        break;
     }
 }
 
@@ -497,8 +545,8 @@ void MapWidget::paintEvent(QPaintEvent *)
         QPoint visAreaEnd = getCellUnderMouse(visAreaBeg + QPoint(this->width(), this->height()));
         clipCellCoord(visAreaEnd);
 
-        for(i = visAreaBeg.x(); i <= visAreaEnd.x(); i++) {
-            for(j = visAreaBeg.y(); j <= visAreaEnd.y(); j++) {
+        for(i = visAreaBeg.x(); i <= visAreaEnd.x(); ++i) {
+            for(j = visAreaBeg.y(); j <= visAreaEnd.y(); ++j) {
                 tile_indx = mCells.at(i + j * mCols);
                 if (tile_indx >= 0)
                     painter.drawImage(i * mTileSize.width(), j * mTileSize.height(), mTiles[tile_indx].im);
@@ -524,7 +572,20 @@ void MapWidget::paintEvent(QPaintEvent *)
             break;
 
         case GRAB:
-            //
+            {
+                QRect selArea = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
+                QRect frame(
+                    mCellUnderMouse.x() - mGrabOrigin.x(),
+                    mCellUnderMouse.y() - mGrabOrigin.y(),
+                    selArea.width(),
+                    selArea.height());
+                painter.fillRect(
+                    frame.left() * mTileSize.width(),
+                    frame.top() * mTileSize.height(),
+                    frame.width() * mTileSize.width(),
+                    frame.height() * mTileSize.height(),
+                    QColor(127, 127, 255, 50));
+            }
             break;
         }
 

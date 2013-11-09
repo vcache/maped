@@ -31,6 +31,7 @@ public:
     QRect getSelectedTilesCount() const;
     void startModeGrab();
     void startModeDuplicate();
+    void finishSpecialMode(bool confirm);
 
 protected:
     void paintEvent(QPaintEvent * event);
