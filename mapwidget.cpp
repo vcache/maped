@@ -7,8 +7,6 @@
  *  - some strange bug with cursor highligh
  *	- sprites list: remove
  *  - refact selArea
- *  - filtering?
- *  - duplicate region
  *  - static objects
  **/
 #include "mapwidget.h"
@@ -334,6 +332,7 @@ void MapWidget::finishSpecialMode(bool confirm)
                 mCellUnderMouse.y() - mGrabOrigin.y(),
                 selArea.width(),
                 selArea.height());
+            clipCellRect(destArea);
             src_offset = selArea.left() + selArea.top() * mCols;
             dst_offset = destArea.left() + destArea.top() * mCols;
             for(i = destArea.width()-1; i >= 0 ; --i) {
@@ -499,6 +498,16 @@ void MapWidget::clipCellCoord(QPoint & c) const {
     } else if (c.y() >= mRows) {
         c.setY(mRows - 1);
     }
+}
+
+void MapWidget::clipCellRect(QRect & r) const
+{
+    QPoint topLeft = r.topLeft();
+    QPoint bottomRight = r.bottomRight();
+    clipCellCoord(topLeft);
+    clipCellCoord(bottomRight);
+    r.setTopLeft(topLeft);
+    r.setBottomRight(bottomRight);
 }
 
 /*!

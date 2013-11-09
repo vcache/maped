@@ -43,7 +43,8 @@ protected:
     inline QPointF localToGlobal(QPointF const & local) const;
     inline QPoint getCellUnderMouse(QPointF const & mouse) const;
     inline bool isValidCell(QPoint const & cell) const { return cell.x() >= 0 && cell.y() >= 0 && cell.x() < mCols && cell.y() < mRows; }
-    void clipCellCoord(QPoint & c) const;
+    inline void clipCellCoord(QPoint & c) const;
+    inline void clipCellRect(QRect & r) const;
     QRect getSelectedArea(QPoint const & fst, QPoint const & snd) const;
 
 signals:
