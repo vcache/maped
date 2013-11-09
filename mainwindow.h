@@ -14,6 +14,7 @@
 #include <QSpinBox>
 #include <QPushButton>
 #include <QVBoxLayout>
+#include <QStatusBar>
 #include "mapwidget.h"
 
 namespace Ui {
@@ -38,7 +39,9 @@ private:
     QSpinBox *mapRows;
     QSpinBox *mapCols;
     QPushButton *selectTileset;
-    QComboBox * scaleCombo;
+    QComboBox *scaleCombo;
+    QStatusBar *status;
+    QLabel *lblSelected;
     QLabel *createLabel(const QString &text);
     void loadTileSet(QStringList const & files);
 

@@ -64,6 +64,11 @@ MainWindow::MainWindow(QWidget *parent) :
     setCentralWidget(splitter);
     setWindowTitle("MapEd");
 
+    status = new QStatusBar;
+    status->addPermanentWidget(lblSelected = new QLabel);
+    lblSelected->setText("None selected");
+    setStatusBar(status);
+
     QAction * act;
     QMenu * menu;
 
@@ -122,12 +127,16 @@ void MainWindow::onTileChanged(int indx) {
 void MainWindow::onCellSelected() {
     disconnect(tiles, SIGNAL(currentIndexChanged(int)), this, 0);
     tiles->setCurrentIndex(map->getSelectedTile());
+    QRect sel = map->getSelectedTilesCount();
+    QString s = QString("Selected %1 cells (%2X%3)").arg(sel.width() * sel.height()).arg(sel.width()).arg(sel.height());
+    lblSelected->setText(s);
     connect(tiles, SIGNAL(currentIndexChanged(int)), this, SLOT(onTileChanged(int)));
 }
 
 void MainWindow::onCellDeselected() {
     disconnect(tiles, SIGNAL(currentIndexChanged(int)), this, 0);
     tiles->setCurrentIndex(-1);
+    lblSelected->setText("None selected");
     connect(tiles, SIGNAL(currentIndexChanged(int)), this, SLOT(onTileChanged(int)));
 }
 

@@ -231,13 +231,20 @@ void MapWidget::selectAll() {
         delete mSelectionBegin;
         delete mSelectionEnd;
         mSelectionBegin = mSelectionEnd = NULL;
+        emit cellDeselected();
     } else {
         if (mSelectionBegin) delete mSelectionBegin;
         if (mSelectionEnd) delete mSelectionEnd;
         mSelectionBegin = new QPoint(b);
         mSelectionEnd = new QPoint(e);
+        emit cellSelected();
     }
     update();
+}
+
+QRect MapWidget::getSelectedTilesCount() const
+{
+    return (mSelectionBegin && mSelectionEnd) ? getSelectedArea(*mSelectionBegin, *mSelectionEnd) : QRect(0,0,0,0);
 }
 
 int MapWidget::getSelectedTile() const

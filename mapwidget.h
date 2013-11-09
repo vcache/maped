@@ -28,6 +28,7 @@ public:
     inline int getCols() const { return mCols; }
     void eraseSelected();
     void selectAll();
+    QRect getSelectedTilesCount() const;
 
 protected:
     void paintEvent(QPaintEvent * event);
