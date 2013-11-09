@@ -1,0 +1,15 @@
+1. Intro
+
+This is "simplest as possible" 2D editor for tile games. It is deeply Work-In-Progress, don't expect too much.
+
+2. Controls
+
+MapEd follows Blender-like controls.
+	Right mouse click - to select;
+	x - delete;
+	g - grab blocks;
+	Shift+d - duplicate blocks.
+
+3. License
+
+GNU GPL3.

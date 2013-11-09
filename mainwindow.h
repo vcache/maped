@@ -46,6 +46,7 @@ private:
     void loadTileSet(QStringList const & files);
 
 protected slots:
+    void onMiscNotify(QString const &);
     void onOpenRequest();
     void onSaveRequest();
     void onSelectTileset();

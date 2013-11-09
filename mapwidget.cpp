@@ -5,6 +5,8 @@
  *
  * TODO features:
  *	- sprites list: remove
+ *  - refact selArea
+ *  - filtering?
  *  - duplicate region
  *  - grab region
  *  - static objects
@@ -19,7 +21,16 @@
 #include <QFile>
 
 MapWidget::MapWidget(QWidget *parent) :
-    QWidget(parent), mRows(0), mCols(0), mTileSize(-1, -1), mViewportPos(.0f, .0f), mCellUnderMouse(-1, -1), mSelectionBegin(NULL), mSelectionEnd(NULL), mScale(1.0f)
+    QWidget(parent),
+    mRows(0),
+    mCols(0),
+    mEditMode(NORMAL),
+    mTileSize(-1, -1),
+    mViewportPos(.0f, .0f),
+    mCellUnderMouse(-1, -1),
+    mSelectionBegin(NULL),
+    mSelectionEnd(NULL),
+    mScale(1.0f)
 {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
@@ -269,6 +280,32 @@ int MapWidget::getSelectedTile() const
     return -1;
 }
 
+/*!
+ * \brief MapWidget::startModeGrab
+ * \todo Maybe just throw an exception?
+ */
+void MapWidget::startModeGrab()
+{
+    if (mEditMode != NORMAL) {
+        miscellaneousNotification("Cannot grab from this mode");
+        return;
+    }
+
+    if (!mSelectionBegin || !mSelectionEnd) {
+        emit miscellaneousNotification("Nothing selected to grab");
+        return;
+    }
+
+    QRect gloablOrigin = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
+    //mGrabOrigin = getCellUnderMouse() - TODO HERE;
+    mEditMode = GRAB;
+}
+
+void MapWidget::startModeDuplicate()
+{
+    emit miscellaneousNotification("Not yet implemented");
+}
+
 void MapWidget::setSelectedTile(int tile)
 {
     if (mSelectionBegin && mSelectionEnd) {
@@ -308,6 +345,14 @@ void MapWidget::keyPressEvent(QKeyEvent * event) {
         update();
     } else if (event->key() == Qt::Key_A && event->modifiers() == Qt::NoModifier) {
         selectAll();
+    } else if (event->key() == Qt::Key_G && event->modifiers() == Qt::NoModifier) {
+        startModeGrab();
+    } else if (event->key() == Qt::Key_D && event->modifiers() == Qt::ShiftModifier) {
+        startModeDuplicate();
+    } else if (event->key() == Qt::Key_Escape && event->modifiers() == Qt::ShiftModifier) {
+        mEditMode = NORMAL;
+    } else if (event->key() == Qt::Key_Enter && event->modifiers() == Qt::ShiftModifier) {
+        //finishSpecialMode();
     } else
         QWidget::keyPressEvent(event);
 }
@@ -394,6 +439,12 @@ void MapWidget::clipCellCoord(QPoint & c) const {
     }
 }
 
+/*!
+ * \brief Get correct area (clipped and sorted) of rectangular selection. fst and snd may come in any order and may be out-of-boundary.
+ * \param fst First point of rectange (in "row-col" units).
+ * \param snd Second point of rectange (in "row-col" units).
+ * \return Nice and correct area in table.
+ */
 QRect MapWidget::getSelectedArea(QPoint const & fst, QPoint const & snd) const
 {
     QRect frame;
@@ -431,7 +482,7 @@ void MapWidget::paintEvent(QPaintEvent *)
     QRectF rectf(0, 0, width(), height());
     QPointF vpTopLeft = mViewportPos + mDragOffset;
 
-    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
 
     painter.fillRect(rectf, Qt::black);
 
@@ -454,20 +505,30 @@ void MapWidget::paintEvent(QPaintEvent *)
             }
         }
 
-        if (mSelectionBegin && !mSelectionEnd) {
-            QRect frame = getSelectedArea(*mSelectionBegin, mCellUnderMouse);
-            painter.fillRect(
-                frame.left() * mTileSize.width(),
-                frame.top() * mTileSize.height(),
-                frame.width() * mTileSize.width(),
-                frame.height() * mTileSize.height(),
-                QColor(127, 127, 255, 50));
-        } else if (isValidCell(mCellUnderMouse)) {
-            int x = mCellUnderMouse.x() * mTileSize.width();
-            int y = mCellUnderMouse.y() * mTileSize.height();
-            painter.fillRect(x, y, mTileSize.width(), mTileSize.height(), QColor(127, 127, 255, 50));
+        // highlight cursor
+        switch (mEditMode) {
+        case NORMAL:
+            if (mSelectionBegin && !mSelectionEnd) {
+                QRect frame = getSelectedArea(*mSelectionBegin, mCellUnderMouse);
+                painter.fillRect(
+                    frame.left() * mTileSize.width(),
+                    frame.top() * mTileSize.height(),
+                    frame.width() * mTileSize.width(),
+                    frame.height() * mTileSize.height(),
+                    QColor(127, 127, 255, 50));
+            } else if (isValidCell(mCellUnderMouse)) {
+                int x = mCellUnderMouse.x() * mTileSize.width();
+                int y = mCellUnderMouse.y() * mTileSize.height();
+                painter.fillRect(x, y, mTileSize.width(), mTileSize.height(), QColor(127, 127, 255, 50));
+            }
+            break;
+
+        case GRAB:
+            //
+            break;
         }
 
+        // highlight selected
         if (mSelectionBegin && mSelectionEnd) {
             QRect frame = getSelectedArea(*mSelectionBegin, *mSelectionEnd);
             painter.fillRect(

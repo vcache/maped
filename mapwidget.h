@@ -29,6 +29,8 @@ public:
     void eraseSelected();
     void selectAll();
     QRect getSelectedTilesCount() const;
+    void startModeGrab();
+    void startModeDuplicate();
 
 protected:
     void paintEvent(QPaintEvent * event);
@@ -46,12 +48,16 @@ protected:
 signals:
     void cellSelected();
     void cellDeselected();
+    void miscellaneousNotification(QString const &);
 
 public slots:
 
 private:
     int mRows, mCols;
     QVector<int> mCells;
+
+    enum EditMode { NORMAL, GRAB };
+    EditMode mEditMode;
 
     QSize mTileSize;
     struct MapTile {
@@ -68,6 +74,7 @@ private:
     QPointF mDragOrigin;
     QPoint mCellUnderMouse;
     QPoint * mSelectionBegin, * mSelectionEnd;
+    QPoint mGrabOrigin;
     float mScale;
 };
 

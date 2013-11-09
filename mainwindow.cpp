@@ -18,9 +18,14 @@
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent)
 {   
+    /* Map widget */
+
     map = new MapWidget;
     connect(map, SIGNAL(cellSelected()), this, SLOT(onCellSelected()));
     connect(map, SIGNAL(cellDeselected()), this, SLOT(onCellDeselected()));
+    connect(map, SIGNAL(miscellaneousNotification(QString const&)), this, SLOT(onMiscNotify(QString const&)));
+
+    /* Properites bar */
 
     props = new QGroupBox;
     props->setTitle("Properties");
@@ -64,10 +69,14 @@ MainWindow::MainWindow(QWidget *parent) :
     setCentralWidget(splitter);
     setWindowTitle("MapEd");
 
+    /* Status bar */
+
     status = new QStatusBar;
     status->addPermanentWidget(lblSelected = new QLabel);
     lblSelected->setText("None selected");
     setStatusBar(status);
+
+    /* Main menu */
 
     QAction * act;
     QMenu * menu;
@@ -120,6 +129,10 @@ void MainWindow::onSaveRequest()
     }
 }
 
+void MainWindow::onMiscNotify(QString const & msg) {
+    status->showMessage(msg, 2000);
+}
+
 void MainWindow::onTileChanged(int indx) {
     map->setSelectedTile(indx);
 }
@@ -158,7 +171,7 @@ void MainWindow::loadTileSet(QStringList const & files) {
 }
 
 void MainWindow::onSelectTileset() {
-    QStringList files = QFileDialog::getOpenFileNames(this, "Select one or more files to open", "/home/igor/workspace/RainbowCrash/res/drawable-nodpi/", "Images (*.png *.xpm *.jpg *.bmp *.jpeg)");
+    QStringList files = QFileDialog::getOpenFileNames(this, "Select one or more files to open", "", "Images (*.png *.xpm *.jpg *.bmp *.jpeg)");
     loadTileSet(files);
 }
 
